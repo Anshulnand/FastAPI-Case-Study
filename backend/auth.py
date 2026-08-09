@@ -1,0 +1,1 @@
+# Authentication (JWT) is an optional extension and has been omitted per core Case Study spec.
