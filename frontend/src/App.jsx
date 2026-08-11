@@ -17,6 +17,7 @@ export default function App() {
   // Auth state
   const [user, setUser] = useState(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authLoading, setAuthLoading] = useState(false);
 
   // Data state
   const [employees, setEmployees] = useState([]);
@@ -54,16 +55,20 @@ export default function App() {
   useEffect(() => {
     const checkUser = async () => {
       const res = await getCurrentUser();
-      if (res.success) setUser(res.data);
+      if (res.success) {
+        setUser(res.data);
+      }
     };
     checkUser();
     loadEmployees();
   }, []);
 
-  // Reload tasks whenever filters or pagination changes
+  // Reload tasks whenever user logs in or filters/pagination changes
   useEffect(() => {
-    loadTasks();
-  }, [statusFilter, priorityFilter, selectedEmployeeId, searchQuery, currentPage, pageSize]);
+    if (user) {
+      loadTasks();
+    }
+  }, [user, statusFilter, priorityFilter, selectedEmployeeId, searchQuery, currentPage, pageSize]);
 
   const loadEmployees = async () => {
     const res = await getEmployees();
@@ -89,13 +94,21 @@ export default function App() {
 
   // Auth Handlers
   const handleLogin = async (email, password) => {
+    setAuthLoading(true);
     const res = await loginUser(email, password);
+    setAuthLoading(false);
     if (res.success) {
       setUser(res.data.user);
       showToast(`Welcome back, ${res.data.user.name || 'User'}!`);
       loadTasks();
     }
     return res;
+  };
+
+  const handleQuickDemoLogin = async (role) => {
+    const email = role === 'admin' ? 'admin@company.com' : 'employee@company.com';
+    const password = role === 'admin' ? 'admin123' : 'emp123';
+    await handleLogin(email, password);
   };
 
   const handleRegister = async (name, email, password, role) => {
@@ -109,6 +122,7 @@ export default function App() {
   const handleLogout = () => {
     logoutUser();
     setUser(null);
+    setTasks([]);
     showToast('Logged out successfully');
   };
 
@@ -247,7 +261,7 @@ export default function App() {
               <div className="flex items-center space-x-2">
                 <h1 className="text-base font-bold text-slate-900 tracking-tight">Employee Task Tracker</h1>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-200 hidden sm:inline-block">
-                  JWT & Pagination API
+                  JWT Authenticated
                 </span>
               </div>
               <p className="text-[11px] text-slate-500 hidden sm:block">Case Study Task Assignment & Status System</p>
@@ -255,41 +269,42 @@ export default function App() {
           </div>
 
           <div className="flex items-center space-x-2.5">
-            <button
-              onClick={() => setIsEmpModalOpen(true)}
-              className="px-3.5 py-2 border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl transition shadow-xs flex items-center space-x-1.5"
-            >
-              <span>+</span>
-              <span>Add Employee</span>
-            </button>
-            <button
-              onClick={() => setIsTaskModalOpen(true)}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl transition shadow-sm shadow-indigo-600/20 flex items-center space-x-1.5"
-            >
-              <span>+</span>
-              <span>Add Task</span>
-            </button>
-
-            {/* Auth Button */}
             {user ? (
-              <div className="flex items-center space-x-2 pl-2 border-l border-slate-200">
-                <div className="hidden sm:flex flex-col text-right">
-                  <span className="text-xs font-bold text-slate-800">{user.name || user.email}</span>
-                  <span className="text-[10px] font-extrabold uppercase text-indigo-600">{user.role || 'employee'}</span>
-                </div>
+              <>
                 <button
-                  onClick={handleLogout}
-                  className="px-3 py-1.5 border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-semibold rounded-xl transition"
+                  onClick={() => setIsEmpModalOpen(true)}
+                  className="px-3.5 py-2 border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl transition shadow-xs flex items-center space-x-1.5"
                 >
-                  Logout
+                  <span>+</span>
+                  <span>Add Employee</span>
                 </button>
-              </div>
+                <button
+                  onClick={() => setIsTaskModalOpen(true)}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl transition shadow-sm shadow-indigo-600/20 flex items-center space-x-1.5"
+                >
+                  <span>+</span>
+                  <span>Add Task</span>
+                </button>
+
+                <div className="flex items-center space-x-2 pl-2 border-l border-slate-200">
+                  <div className="hidden sm:flex flex-col text-right">
+                    <span className="text-xs font-bold text-slate-800">{user.name || user.email}</span>
+                    <span className="text-[10px] font-extrabold uppercase text-indigo-600">{user.role || 'employee'}</span>
+                  </div>
+                  <button
+                    onClick={handleLogout}
+                    className="px-3 py-1.5 border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-semibold rounded-xl transition"
+                  >
+                    Logout
+                  </button>
+                </div>
+              </>
             ) : (
               <button
                 onClick={() => setIsAuthModalOpen(true)}
-                className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-xl transition shadow-xs"
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl transition shadow-sm shadow-indigo-600/20"
               >
-                Sign In / JWT Auth
+                Sign In / Register
               </button>
             )}
           </div>
@@ -297,257 +312,321 @@ export default function App() {
         </div>
       </header>
 
-      {/* Main Workspace Container */}
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-6">
-        
-        {/* Metric Summary Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div className="bg-white border border-slate-200/80 p-4 rounded-2xl shadow-xs">
-            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Total Tasks</p>
-            <h3 className="text-2xl font-bold text-slate-900 mt-1">{totalTasks}</h3>
-          </div>
-
-          <div className="bg-white border border-slate-200/80 p-4 rounded-2xl shadow-xs">
-            <p className="text-[11px] font-semibold text-amber-600 uppercase tracking-wider">Pending (Current Page)</p>
-            <h3 className="text-2xl font-bold text-slate-900 mt-1">{pendingCount}</h3>
-          </div>
-
-          <div className="bg-white border border-slate-200/80 p-4 rounded-2xl shadow-xs">
-            <p className="text-[11px] font-semibold text-blue-600 uppercase tracking-wider">In-Progress (Current Page)</p>
-            <h3 className="text-2xl font-bold text-slate-900 mt-1">{inProgressCount}</h3>
-          </div>
-
-          <div className="bg-white border border-slate-200/80 p-4 rounded-2xl shadow-xs">
-            <p className="text-[11px] font-semibold text-emerald-600 uppercase tracking-wider">Completed (Current Page)</p>
-            <h3 className="text-2xl font-bold text-slate-900 mt-1">{completedCount}</h3>
-          </div>
-        </div>
-
-        {/* Multi-Criteria Filter Toolbar */}
-        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
-            <div>
-              <h2 className="text-sm font-bold text-slate-900">Task Filters & Search</h2>
-              <p className="text-xs text-slate-500">Filter by status, priority, employee assignment, or keyword search</p>
-            </div>
-            <button
-              onClick={handleResetFilters}
-              className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 underline self-start sm:self-auto"
-            >
-              Reset All Filters
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      {/* Main Workspace: Render Login Guard screen if not logged in */}
+      {!user ? (
+        <main className="max-w-4xl mx-auto px-4 py-16 text-center">
+          <div className="bg-white border border-slate-200 rounded-3xl p-8 sm:p-12 shadow-xl space-y-6 max-w-xl mx-auto relative overflow-hidden">
             
-            {/* Search Input */}
-            <div>
-              <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Search Title</label>
-              <input
-                type="text"
-                placeholder="Search tasks..."
-                value={searchQuery}
-                onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-                className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs bg-slate-50 text-slate-800 focus:outline-none focus:border-indigo-500 focus:bg-white font-medium"
-              />
+            <div className="w-16 h-16 rounded-2xl bg-indigo-600/10 text-indigo-600 border border-indigo-500/20 flex items-center justify-center mx-auto text-3xl font-black shadow-inner">
+              🔐
             </div>
 
-            {/* Status Filter */}
-            <div>
-              <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Status</label>
-              <select
-                value={statusFilter}
-                onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
-                className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs bg-slate-50 text-slate-800 focus:outline-none focus:border-indigo-500 focus:bg-white font-medium cursor-pointer"
-              >
-                <option value="All">All Statuses</option>
-                <option value="Pending">Pending</option>
-                <option value="In-Progress">In-Progress</option>
-                <option value="Completed">Completed</option>
-              </select>
+            <div className="space-y-2">
+              <h2 className="text-2xl font-black text-slate-900 tracking-tight">Authentication Required</h2>
+              <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
+                Please sign in to your Employee Task Tracker account to view employee assignments, manage task priorities, and update project status.
+              </p>
             </div>
 
-            {/* Priority Filter */}
-            <div>
-              <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Priority</label>
-              <select
-                value={priorityFilter}
-                onChange={(e) => { setPriorityFilter(e.target.value); setCurrentPage(1); }}
-                className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs bg-slate-50 text-slate-800 focus:outline-none focus:border-indigo-500 focus:bg-white font-medium cursor-pointer"
-              >
-                <option value="All">All Priorities</option>
-                <option value="Low">Low</option>
-                <option value="Medium">Medium</option>
-                <option value="High">High</option>
-                <option value="Urgent">Urgent</option>
-              </select>
-            </div>
-
-            {/* Employee Filter */}
-            <div>
-              <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Assigned Employee</label>
-              <select
-                value={selectedEmployeeId}
-                onChange={(e) => { setSelectedEmployeeId(e.target.value); setCurrentPage(1); }}
-                className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs bg-slate-50 text-slate-800 focus:outline-none focus:border-indigo-500 focus:bg-white font-medium cursor-pointer"
-              >
-                <option value="All">All Employees ({employees.length})</option>
-                {employees.map((emp) => (
-                  <option key={emp.id} value={emp.id}>
-                    {emp.name} (ID: #{emp.id})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-          </div>
-        </div>
-
-        {/* Tasks Grid */}
-        <div>
-          <div className="flex items-center justify-between mb-4 px-1">
-            <h3 className="text-base font-bold text-slate-900">Task Records</h3>
-            <span className="text-xs text-slate-500 font-medium">
-              Showing page {currentPage} of {totalPages} ({totalTasks} total tasks)
-            </span>
-          </div>
-
-          {tasks.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {tasks.map((t) => {
-                const emp = employees.find((e) => e.id === t.employee_id);
-                const empName = emp ? emp.name : `Employee #${t.employee_id}`;
-
-                return (
-                  <div
-                    key={t.id}
-                    className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs hover:shadow-md hover:border-indigo-200 transition-all duration-200 flex flex-col justify-between space-y-4"
-                  >
-                    <div>
-                      {/* Top Bar: ID, Priority & Status */}
-                      <div className="flex items-center justify-between gap-2 mb-3">
-                        <span className="text-xs font-mono font-semibold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md">
-                          #TASK-{t.id}
-                        </span>
-
-                        <div className="flex items-center space-x-1.5">
-                          {/* Priority Badge / Dropdown */}
-                          <select
-                            value={t.priority || 'Medium'}
-                            onChange={(e) => handlePriorityChange(t.id, e.target.value)}
-                            className={`text-[11px] font-bold px-2 py-0.5 rounded-md border cursor-pointer focus:outline-none ${getPriorityBadge(t.priority)}`}
-                          >
-                            <option value="Low">Low</option>
-                            <option value="Medium">Medium</option>
-                            <option value="High">High</option>
-                            <option value="Urgent">Urgent</option>
-                          </select>
-
-                          {/* Status Dropdown */}
-                          <select
-                            value={t.status}
-                            onChange={(e) => handleStatusChange(t.id, e.target.value)}
-                            className={`text-xs font-semibold px-2.5 py-1 rounded-lg border transition cursor-pointer focus:outline-none ${getStatusBadge(t.status)}`}
-                          >
-                            <option value="Pending">Pending</option>
-                            <option value="In-Progress">In-Progress</option>
-                            <option value="Completed">Completed</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      {/* Task Title */}
-                      <h4 className="text-sm font-bold text-slate-900 leading-snug">
-                        {t.title}
-                      </h4>
-                    </div>
-
-                    {/* Timestamps & Assignee Footer */}
-                    <div className="pt-3 border-t border-slate-100 space-y-2 text-xs">
-                      {/* Timestamps */}
-                      <div className="flex items-center justify-between text-[11px] text-slate-400 font-medium">
-                        <span>Created: {formatDate(t.created_at)}</span>
-                        {t.updated_at && (
-                          <span>Updated: {formatDate(t.updated_at)}</span>
-                        )}
-                      </div>
-
-                      {/* Employee Avatar */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <div className="h-7 w-7 rounded-full bg-indigo-100 text-indigo-700 font-bold text-[11px] flex items-center justify-center">
-                            {getInitials(empName)}
-                          </div>
-                          <span className="font-semibold text-slate-700">{empName}</span>
-                        </div>
-
-                        <span className="text-[11px] text-slate-400 font-mono">ID: #{t.employee_id}</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="bg-white border border-slate-200/80 rounded-2xl p-12 text-center text-slate-500 space-y-3">
-              <div className="w-12 h-12 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto text-lg font-bold">
-                📋
+            {/* Quick Demo Presets */}
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Instant 1-Click Demo Login</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => handleQuickDemoLogin('employee')}
+                  disabled={authLoading}
+                  className="w-full py-2.5 px-3 rounded-xl bg-white border border-slate-300 hover:border-indigo-500 hover:bg-indigo-50/50 text-slate-800 text-xs font-bold transition flex items-center justify-center space-x-2 shadow-xs"
+                >
+                  <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                  <span>Login as Employee Demo</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleQuickDemoLogin('admin')}
+                  disabled={authLoading}
+                  className="w-full py-2.5 px-3 rounded-xl bg-white border border-slate-300 hover:border-indigo-500 hover:bg-indigo-50/50 text-slate-800 text-xs font-bold transition flex items-center justify-center space-x-2 shadow-xs"
+                >
+                  <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                  <span>Login as Admin Demo</span>
+                </button>
               </div>
-              <p className="text-xs font-medium">No tasks matching current filters.</p>
+            </div>
+
+            {/* Custom Login Form Trigger */}
+            <div>
               <button
-                onClick={handleResetFilters}
-                className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 underline"
+                onClick={() => setIsAuthModalOpen(true)}
+                className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-600/30 transition duration-200 flex items-center justify-center space-x-2"
               >
-                Reset Filters
+                <span>Enter Email & Password / Register</span>
+                <span>→</span>
               </button>
             </div>
-          )}
-        </div>
 
-        {/* Pagination Controls */}
-        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xs">
-          
-          <div className="flex items-center space-x-3 text-xs text-slate-500 font-medium">
-            <span>Per page:</span>
-            <select
-              value={pageSize}
-              onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
-              className="border border-slate-300 rounded-lg px-2 py-1 text-xs bg-slate-50 text-slate-800 font-semibold cursor-pointer focus:outline-none"
-            >
-              <option value={3}>3 tasks</option>
-              <option value={6}>6 tasks</option>
-              <option value={12}>12 tasks</option>
-              <option value={24}>24 tasks</option>
-            </select>
-            <span className="hidden sm:inline">|</span>
-            <span>Total: <b>{totalTasks}</b> tasks</span>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-              disabled={currentPage === 1}
-              className="px-3 py-1.5 border border-slate-300 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
-            >
-              ← Previous
-            </button>
-
-            <div className="px-3 py-1 text-xs font-bold text-slate-700 bg-slate-100 rounded-xl">
-              Page {currentPage} of {totalPages}
+            {/* Feature Pills Footer */}
+            <div className="pt-4 border-t border-slate-100 flex flex-wrap items-center justify-center gap-2 text-[10px] text-slate-400 font-semibold">
+              <span className="px-2.5 py-1 rounded-full bg-slate-100">🔐 JWT Security</span>
+              <span className="px-2.5 py-1 rounded-full bg-slate-100">🏷️ Task Priority</span>
+              <span className="px-2.5 py-1 rounded-full bg-slate-100">⏱️ Audit Timestamps</span>
+              <span className="px-2.5 py-1 rounded-full bg-slate-100">📑 Server Pagination</span>
             </div>
 
-            <button
-              onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-              disabled={currentPage >= totalPages}
-              className="px-3 py-1.5 border border-slate-300 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
-            >
-              Next →
-            </button>
+          </div>
+        </main>
+      ) : (
+        /* Authenticated Dashboard View */
+        <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-6">
+          
+          {/* Metric Summary Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="bg-white border border-slate-200/80 p-4 rounded-2xl shadow-xs">
+              <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Total Tasks</p>
+              <h3 className="text-2xl font-bold text-slate-900 mt-1">{totalTasks}</h3>
+            </div>
+
+            <div className="bg-white border border-slate-200/80 p-4 rounded-2xl shadow-xs">
+              <p className="text-[11px] font-semibold text-amber-600 uppercase tracking-wider">Pending (Current Page)</p>
+              <h3 className="text-2xl font-bold text-slate-900 mt-1">{pendingCount}</h3>
+            </div>
+
+            <div className="bg-white border border-slate-200/80 p-4 rounded-2xl shadow-xs">
+              <p className="text-[11px] font-semibold text-blue-600 uppercase tracking-wider">In-Progress (Current Page)</p>
+              <h3 className="text-2xl font-bold text-slate-900 mt-1">{inProgressCount}</h3>
+            </div>
+
+            <div className="bg-white border border-slate-200/80 p-4 rounded-2xl shadow-xs">
+              <p className="text-[11px] font-semibold text-emerald-600 uppercase tracking-wider">Completed (Current Page)</p>
+              <h3 className="text-2xl font-bold text-slate-900 mt-1">{completedCount}</h3>
+            </div>
           </div>
 
-        </div>
+          {/* Multi-Criteria Filter Toolbar */}
+          <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+              <div>
+                <h2 className="text-sm font-bold text-slate-900">Task Filters & Search</h2>
+                <p className="text-xs text-slate-500">Filter by status, priority, employee assignment, or keyword search</p>
+              </div>
+              <button
+                onClick={handleResetFilters}
+                className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 underline self-start sm:self-auto"
+              >
+                Reset All Filters
+              </button>
+            </div>
 
-      </main>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              
+              {/* Search Input */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Search Title</label>
+                <input
+                  type="text"
+                  placeholder="Search tasks..."
+                  value={searchQuery}
+                  onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                  className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs bg-slate-50 text-slate-800 focus:outline-none focus:border-indigo-500 focus:bg-white font-medium"
+                />
+              </div>
+
+              {/* Status Filter */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Status</label>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
+                  className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs bg-slate-50 text-slate-800 focus:outline-none focus:border-indigo-500 focus:bg-white font-medium cursor-pointer"
+                >
+                  <option value="All">All Statuses</option>
+                  <option value="Pending">Pending</option>
+                  <option value="In-Progress">In-Progress</option>
+                  <option value="Completed">Completed</option>
+                </select>
+              </div>
+
+              {/* Priority Filter */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Priority</label>
+                <select
+                  value={priorityFilter}
+                  onChange={(e) => { setPriorityFilter(e.target.value); setCurrentPage(1); }}
+                  className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs bg-slate-50 text-slate-800 focus:outline-none focus:border-indigo-500 focus:bg-white font-medium cursor-pointer"
+                >
+                  <option value="All">All Priorities</option>
+                  <option value="Low">Low</option>
+                  <option value="Medium">Medium</option>
+                  <option value="High">High</option>
+                  <option value="Urgent">Urgent</option>
+                </select>
+              </div>
+
+              {/* Employee Filter */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Assigned Employee</label>
+                <select
+                  value={selectedEmployeeId}
+                  onChange={(e) => { setSelectedEmployeeId(e.target.value); setCurrentPage(1); }}
+                  className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs bg-slate-50 text-slate-800 focus:outline-none focus:border-indigo-500 focus:bg-white font-medium cursor-pointer"
+                >
+                  <option value="All">All Employees ({employees.length})</option>
+                  {employees.map((emp) => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.name} (ID: #{emp.id})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+            </div>
+          </div>
+
+          {/* Tasks Grid */}
+          <div>
+            <div className="flex items-center justify-between mb-4 px-1">
+              <h3 className="text-base font-bold text-slate-900">Task Records</h3>
+              <span className="text-xs text-slate-500 font-medium">
+                Showing page {currentPage} of {totalPages} ({totalTasks} total tasks)
+              </span>
+            </div>
+
+            {tasks.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {tasks.map((t) => {
+                  const emp = employees.find((e) => e.id === t.employee_id);
+                  const empName = emp ? emp.name : `Employee #${t.employee_id}`;
+
+                  return (
+                    <div
+                      key={t.id}
+                      className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs hover:shadow-md hover:border-indigo-200 transition-all duration-200 flex flex-col justify-between space-y-4"
+                    >
+                      <div>
+                        {/* Top Bar: ID, Priority & Status */}
+                        <div className="flex items-center justify-between gap-2 mb-3">
+                          <span className="text-xs font-mono font-semibold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md">
+                            #TASK-{t.id}
+                          </span>
+
+                          <div className="flex items-center space-x-1.5">
+                            {/* Priority Badge / Dropdown */}
+                            <select
+                              value={t.priority || 'Medium'}
+                              onChange={(e) => handlePriorityChange(t.id, e.target.value)}
+                              className={`text-[11px] font-bold px-2 py-0.5 rounded-md border cursor-pointer focus:outline-none ${getPriorityBadge(t.priority)}`}
+                            >
+                              <option value="Low">Low</option>
+                              <option value="Medium">Medium</option>
+                              <option value="High">High</option>
+                              <option value="Urgent">Urgent</option>
+                            </select>
+
+                            {/* Status Dropdown */}
+                            <select
+                              value={t.status}
+                              onChange={(e) => handleStatusChange(t.id, e.target.value)}
+                              className={`text-xs font-semibold px-2.5 py-1 rounded-lg border transition cursor-pointer focus:outline-none ${getStatusBadge(t.status)}`}
+                            >
+                              <option value="Pending">Pending</option>
+                              <option value="In-Progress">In-Progress</option>
+                              <option value="Completed">Completed</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Task Title */}
+                        <h4 className="text-sm font-bold text-slate-900 leading-snug">
+                          {t.title}
+                        </h4>
+                      </div>
+
+                      {/* Timestamps & Assignee Footer */}
+                      <div className="pt-3 border-t border-slate-100 space-y-2 text-xs">
+                        {/* Timestamps */}
+                        <div className="flex items-center justify-between text-[11px] text-slate-400 font-medium">
+                          <span>Created: {formatDate(t.created_at)}</span>
+                          {t.updated_at && (
+                            <span>Updated: {formatDate(t.updated_at)}</span>
+                          )}
+                        </div>
+
+                        {/* Employee Avatar */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <div className="h-7 w-7 rounded-full bg-indigo-100 text-indigo-700 font-bold text-[11px] flex items-center justify-center">
+                              {getInitials(empName)}
+                            </div>
+                            <span className="font-semibold text-slate-700">{empName}</span>
+                          </div>
+
+                          <span className="text-[11px] text-slate-400 font-mono">ID: #{t.employee_id}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="bg-white border border-slate-200/80 rounded-2xl p-12 text-center text-slate-500 space-y-3">
+                <div className="w-12 h-12 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto text-lg font-bold">
+                  📋
+                </div>
+                <p className="text-xs font-medium">No tasks matching current filters.</p>
+                <button
+                  onClick={handleResetFilters}
+                  className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 underline"
+                >
+                  Reset Filters
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Pagination Controls */}
+          <div className="bg-white border border-slate-200/80 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xs">
+            
+            <div className="flex items-center space-x-3 text-xs text-slate-500 font-medium">
+              <span>Per page:</span>
+              <select
+                value={pageSize}
+                onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+                className="border border-slate-300 rounded-lg px-2 py-1 text-xs bg-slate-50 text-slate-800 font-semibold cursor-pointer focus:outline-none"
+              >
+                <option value={3}>3 tasks</option>
+                <option value={6}>6 tasks</option>
+                <option value={12}>12 tasks</option>
+                <option value={24}>24 tasks</option>
+              </select>
+              <span className="hidden sm:inline">|</span>
+              <span>Total: <b>{totalTasks}</b> tasks</span>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1.5 border border-slate-300 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+              >
+                ← Previous
+              </button>
+
+              <div className="px-3 py-1 text-xs font-bold text-slate-700 bg-slate-100 rounded-xl">
+                Page {currentPage} of {totalPages}
+              </div>
+
+              <button
+                onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                disabled={currentPage >= totalPages}
+                className="px-3 py-1.5 border border-slate-300 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+              >
+                Next →
+              </button>
+            </div>
+
+          </div>
+
+        </main>
+      )}
 
       {/* Modal: Add Employee */}
       {isEmpModalOpen && (
