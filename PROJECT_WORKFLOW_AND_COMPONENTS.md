@@ -1,90 +1,111 @@
-# 🚀 Employee Task Tracker — Core Case Study Documentation
+# 🚀 Employee Task Tracker — System Architecture & Workflow
 
-This document provides the strict technical documentation for the **Employee Task Tracker** application adhering strictly to the core requirements specified in `Employee_Task_Tracker_Case_Study 1.pdf`.
+This document provides technical documentation for the **Employee Task Tracker** application, including JWT authentication, task priority, timestamps, pagination, and multi-criteria filtering.
 
 ---
 
-## 1. 🛠️ System Overview & Tech Stack
+## 1. 🌐 Live Deployment & Links
 
-The **Employee Task Tracker** is a minimal backend & frontend application designed to manage employees and track their assigned tasks.
+- 🚀 **Live Application Demo**: [https://fast-api-case-study-bwuuu3280-anshuls-projects-42761997.vercel.app](https://fast-api-case-study-bwuuu3280-anshuls-projects-42761997.vercel.app)
+- 🐙 **GitHub Repository**: [https://github.com/Anshulnand/FastAPI-Case-Study](https://github.com/Anshulnand/FastAPI-Case-Study)
 
-> [!IMPORTANT]
-> **Strict Core Implementation**: All optional extensions (JWT authentication, task priority, timestamps, pagination, filtering) have been omitted as requested.
+---
+
+## 2. 🛠️ System Overview & Tech Stack
+
+The **Employee Task Tracker** is a full-stack task assignment and lifecycle status application.
 
 ### Technology Stack
 
 | Layer | Technology | Description |
 | :--- | :--- | :--- |
-| **Backend Framework** | FastAPI (Python) | Exposes standard REST endpoints and OpenAPI docs at `/docs` |
+| **Backend Framework** | FastAPI (Python) | Exposes REST APIs and OpenAPI Swagger docs at `/docs` |
+| **Authentication** | JWT (python-jose & passlib) | Token authentication & password hashing |
 | **Database** | SQLite (`tickets.db`) | Relational database storage |
-| **ORM** | SQLAlchemy | Maps Python models to database tables |
-| **Input Validation** | Pydantic v2 | Enforces non-empty input field constraints |
-| **Frontend Framework** | React 18 & Vite | Lightweight client-side application |
-| **Styling** | Tailwind CSS | Clean, minimal user interface |
+| **ORM** | SQLAlchemy | Maps Python models (`User`, `Employee`, `Task`) to database tables |
+| **Input Validation** | Pydantic v2 | Enforces non-empty field validation and enum constraints |
+| **Frontend Framework** | React 18 & Vite | Client dashboard app |
+| **Styling** | Tailwind CSS | Modern interface with dark/light glassmorphism accents |
 
 ---
 
-## 2. 🔄 End-to-End System Workflow
+## 3. 🔄 System Dataflow Architecture
 
 ```mermaid
 graph TD
-    A[Client Browser] -->|1. Submit Employee / Task Form| B[React Frontend App.jsx]
-    B -->|2. HTTP Request| C[Axios Client api.js]
-    C -->|3. REST API Call| D[FastAPI Backend main.py]
-    D -->|4. Input Field Validation| E[Pydantic Schemas schemas.py]
-    D -->|5. Data Operations| F[CRUD Layer crud.py]
-    F -->|6. ORM Models| G[SQLAlchemy Models models.py]
-    G -->|7. SQL Operations| H[(SQLite Database tickets.db)]
-    H -->|8. Query Response| G
-    G -->|9. Object Results| F
-    F -->|10. JSON Payload| D
-    D -->|11. HTTP Response| C
-    C -->|12. React State Update| B
-    B -->|13. Table Re-render| A
+    A[Client Browser] -->|1. Sign In / Submit Form| B[React Frontend App.jsx]
+    B -->|2. HTTP Request with Bearer Token| C[Axios Client api.js]
+    C -->|3. REST API Request| D[FastAPI Backend main.py]
+    D -->|4. Verify JWT Auth| E[Auth Dependency auth.py]
+    D -->|5. Validate Inputs| F[Pydantic Schemas schemas.py]
+    D -->|6. Paginated & Filtered Query| G[CRUD Layer crud.py]
+    G -->|7. ORM Models| H[SQLAlchemy Models models.py]
+    H -->|8. SQL Execution| I[(SQLite Database tickets.db)]
+    I -->|9. Query Results| H
+    H -->|10. Data Objects| G
+    G -->|11. Paginated JSON Payload| D
+    D -->|12. HTTP Response| C
+    C -->|13. React State Update| B
+    B -->|14. UI Re-render| A
 ```
 
 ---
 
-## 3. 🐍 Backend Component Breakdown (`backend/`)
+## 4. 🐍 Backend Component Breakdown (`backend/`)
 
-#### 1. [`models.py`](file:///d:/STUDY/NOTES/CAPGEMINI%20TRAINING/FastApi/CASE%20STUDY/backend/models.py)
-- **`Employee`**: `id` (Auto PK), `name` (String, Non-empty).
-- **`Task`**: `id` (Auto PK), `title` (String, Non-empty), `status` (Default: `"Pending"`), `employee_id` (FK to `employees.id`).
+#### 1. [`auth.py`](file:///d:/STUDY/NOTES/CAPGEMINI%20TRAINING/FastApi/CASE%20STUDY/backend/auth.py)
+- **Password Hashing**: Secure hashing with `pbkdf2_sha256`.
+- **JWT Token Generation**: Signed tokens created with `jose.jwt` (24 hour expiration).
+- **Dependencies**: `get_current_user` extracts and validates the HTTP Bearer token.
 
-#### 2. [`schemas.py`](file:///d:/STUDY/NOTES/CAPGEMINI%20TRAINING/FastApi/CASE%20STUDY/backend/schemas.py)
-- **`EmployeeCreate`**: Requires non-empty name (`min_length=1`).
-- **`TaskCreate`**: Requires non-empty title (`min_length=1`) and valid `employee_id`. Default status: `"Pending"`.
-- **`TaskStatusUpdate`**: Validates status updates (`Pending`, `In-Progress`, `Completed`).
+#### 2. [`models.py`](file:///d:/STUDY/NOTES/CAPGEMINI%20TRAINING/FastApi/CASE%20STUDY/backend/models.py)
+- **`User`**: `id`, `name`, `email`, `hashed_password`, `role` (`employee` / `admin`), `created_at`.
+- **`Employee`**: `id`, `name`.
+- **`Task`**: `id`, `title`, `status` (`Pending`, `In-Progress`, `Completed`), `priority` (`Low`, `Medium`, `High`, `Urgent`), `employee_id`, `created_at`, `updated_at`.
 
-#### 3. [`crud.py`](file:///d:/STUDY/NOTES/CAPGEMINI%20TRAINING/FastApi/CASE%20STUDY/backend/crud.py)
-- Methods: `create_employee()`, `get_all_employees()`, `get_employee_by_id()`, `create_task()`, `get_all_tasks()`, `get_tasks_by_employee()`, `update_task_status()`.
+#### 3. [`schemas.py`](file:///d:/STUDY/NOTES/CAPGEMINI%20TRAINING/FastApi/CASE%20STUDY/backend/schemas.py)
+- **`UserCreate`**, **`UserLogin`**, **`UserResponse`**, **`Token`**: User authentication payloads.
+- **`TaskCreate`**: Title, employee ID, initial status, and priority.
+- **`TaskResponse`**: Detailed task response including timestamps (`created_at`, `updated_at`) and priority.
+- **`PaginatedTaskResponse`**: Structured wrapper (`items`, `total`, `page`, `limit`, `total_pages`).
 
-#### 4. [`main.py`](file:///d:/STUDY/NOTES/CAPGEMINI%20TRAINING/FastApi/CASE%20STUDY/backend/main.py)
-- Exposes the 5 core PDF endpoints:
-  - `POST /employees/` - Create new employee
-  - `GET /employees/{employee_id}/tasks` - Get all tasks for an employee
-  - `POST /tasks/` - Create new task
-  - `GET /tasks/` - List all tasks in the system
-  - `PUT /tasks/{task_id}` - Update task status
+#### 4. [`crud.py`](file:///d:/STUDY/NOTES/CAPGEMINI%20TRAINING/FastApi/CASE%20STUDY/backend/crud.py)
+- Methods: `create_user()`, `get_user_by_email()`, `create_employee()`, `get_all_employees()`, `create_task()`, `get_paginated_tasks()`, `update_task_status()`.
+
+#### 5. [`main.py`](file:///d:/STUDY/NOTES/CAPGEMINI%20TRAINING/FastApi/CASE%20STUDY/backend/main.py)
+- Auto DB Schema migration check (`ensure_db_schema()`).
+- Default user seeder (`admin@company.com` and `employee@company.com`).
+- Endpoints:
+  - `POST /auth/register` & `POST /auth/login`
+  - `GET /auth/me`
+  - `POST /employees/` & `GET /employees/`
+  - `GET /employees/{employee_id}/tasks`
+  - `POST /tasks/` & `GET /tasks/` (Paginated & Filtered)
+  - `PUT /tasks/{task_id}`
 
 ---
 
-## 4. ⚛️ Frontend Component Breakdown (`frontend/`)
+## 5. ⚛️ Frontend Component Breakdown (`frontend/`)
 
 - **[`src/App.jsx`](file:///d:/STUDY/NOTES/CAPGEMINI%20TRAINING/FastApi/CASE%20STUDY/frontend/src/App.jsx)**:
-  - Main component displaying header, **+ Add Employee** button, **+ Add Task** button, employee task filter selector, and task table with inline status dropdowns.
+  - Main app interface containing metric cards, filter toolbar (Search, Status, Priority, Employee), task card grid, and pagination controls.
+- **[`src/components/AuthModal.jsx`](file:///d:/STUDY/NOTES/CAPGEMINI%20TRAINING/FastApi/CASE%20STUDY/frontend/src/components/AuthModal.jsx)**:
+  - Sign in / Registration modal with quick demo autofill buttons.
 - **[`src/services/api.js`](file:///d:/STUDY/NOTES/CAPGEMINI%20TRAINING/FastApi/CASE%20STUDY/frontend/src/services/api.js)**:
-  - Axios client handling calls to `/employees/`, `/tasks/`, `/employees/{id}/tasks`, and `/tasks/{id}`.
+  - Axios API wrapper with request interceptors attaching JWT authorization tokens.
 
 ---
 
-## 5. 📑 REST API Endpoint Summary
+## 6. 📑 REST API Endpoint Reference
 
-| HTTP Method | Route Endpoint | Description | Constraints & Validation |
+| HTTP Method | Route Endpoint | Description | Query / Body Parameters |
 | :---: | :--- | :--- | :--- |
-| `POST` | `/employees/` | Create a new employee | Employee name must not be empty |
-| `GET` | `/employees/` | List all employees | Returns array of employees |
-| `GET` | `/employees/{employee_id}/tasks` | Get all tasks of a specific employee | Validates employee existence |
-| `POST` | `/tasks/` | Create a new task | Task title non-empty, valid employee ID |
-| `GET` | `/tasks/` | Get all tasks in system | Returns array of tasks |
-| `PUT` | `/tasks/{task_id}` | Update task status | Status must be: `Pending`, `In-Progress`, `Completed` |
+| `POST` | `/auth/register` | Register user account | JSON body: `{ name, email, password, role }` |
+| `POST` | `/auth/login` | Authenticate user & issue JWT | JSON body: `{ email, password }` |
+| `GET` | `/auth/me` | Fetch authenticated profile | Bearer Token header |
+| `POST` | `/employees/` | Create employee record | JSON body: `{ name }` |
+| `GET` | `/employees/` | List all employees | None |
+| `GET` | `/employees/{id}/tasks` | Get tasks by employee | Path param: `employee_id` |
+| `POST` | `/tasks/` | Create a new task | JSON body: `{ title, employee_id, status, priority }` |
+| `GET` | `/tasks/` | List tasks (Filtered & Paginated) | Query params: `page`, `limit`, `status`, `priority`, `employee_id`, `search` |
+| `PUT` | `/tasks/{task_id}` | Update task status or priority | JSON body: `{ status, priority }` |
